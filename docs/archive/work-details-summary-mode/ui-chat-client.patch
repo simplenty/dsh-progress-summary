@@ -1,0 +1,69 @@
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -4154,7 +4154,7 @@
+ 				const location = node?.location;
+ 				return location?.kind === "turn" || location?.kind === "step" ? location.turn : void 0;
+ 			});
+-			const grouped = props.usePresentation((policy) => policy.stepGrouping === "collapsed" || policy.stepGrouping === "history" && turnLocation?.status !== "open" && !deferCollapse);
++			const grouped = props.usePresentation((policy) => policy.stepGrouping === "collapsed" || policy.collapseLiveTurns === true || policy.stepGrouping === "history" && turnLocation?.status !== "open" && !deferCollapse);
+ 			const reason = turnLocation?.end?.data.reason.kind;
+ 			const alwaysOpen = presentation?.turnClosed === false || presentation?.hasInterleavedInput === true || reason === "aborted" || reason === "interrupted" || reason === "error";
+ 			const spec = presentation?.spec;
+@@ -5818,6 +5818,7 @@
+ 			"settings.collapse.completion": "回答结束后",
+ 			"settings.collapse.nextInput": "下次有新消息时",
+ 			"settings.transcript.compact": "简洁",
++			"settings.transcript.summary": "摘要",
+ 			"settings.transcript.standard": "标准",
+ 			"settings.transcript.detailed": "详细",
+ 			"settings.transcript.verbose": "完全展开",
+@@ -6012,6 +6013,7 @@
+ 			"settings.collapse.completion": "On completion",
+ 			"settings.collapse.nextInput": "On next message",
+ 			"settings.transcript.compact": "Compact",
++			"settings.transcript.summary": "Summary",
+ 			"settings.transcript.standard": "Standard",
+ 			"settings.transcript.detailed": "Detailed",
+ 			"settings.transcript.verbose": "Verbose",
+@@ -12624,6 +12626,7 @@
+ 		/** Work-details presentation modes a user can choose. */
+ 		const TRANSCRIPT_VIEW_MODES = [
+ 			"compact",
++			"summary",
+ 			"standard",
+ 			"detailed",
+ 			"verbose"
+@@ -12667,6 +12670,14 @@
+ 				liveProcessDetail: false,
+ 				settledReasoningPreview: false
+ 			},
++			summary: {
++				mode: "summary",
++				foldCompletedTurns: true,
++				stepGrouping: "collapsed",
++				liveProcessDetail: true,
++				settledReasoningPreview: false,
++				collapseLiveTurns: true
++			},
+ 			standard: {
+ 				mode: "standard",
+ 				foldCompletedTurns: true,
+@@ -12695,6 +12706,10 @@
+ 					...POLICIES.compact,
+ 					collapseTiming
+ 				},
++				summary: {
++					...POLICIES.summary,
++					collapseTiming
++				},
+ 				standard: {
+ 					...POLICIES.standard,
+ 					collapseTiming
+@@ -12817,6 +12832,7 @@
+ 		//#region lib/types/client/settings/TranscriptViewRow.js
+ 		const LABELS = {
+ 			compact: "settings.transcript.compact",
++			summary: "settings.transcript.summary",
+ 			standard: "settings.transcript.standard",
+ 			detailed: "settings.transcript.detailed",
+ 			verbose: "settings.transcript.verbose"

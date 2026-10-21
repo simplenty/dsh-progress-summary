@@ -1,0 +1,10 @@
+# Bundle patch: mount the narrator into every profile that installs this
+# package. `dsh plugin --profile <name> add <this package>` appends the package
+# to the profile's `dsh.profile.bundles` (declared in package.json), and this
+# list is what actually inserts the row at boot.
+#
+# Tune it by id in the profile's own cordis.patch.yml user layer — do not insert
+# a second row with the same id.
+- insert:
+    - id: progress-summary
+      name: 'dsh-progress-summary'

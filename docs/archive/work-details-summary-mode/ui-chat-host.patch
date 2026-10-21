@@ -1,0 +1,10 @@
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -14,6 +14,7 @@
+ /** Work-details presentation modes a user can choose. */
+ const TRANSCRIPT_VIEW_MODES = [
+ 	"compact",
++	"summary",
+ 	"standard",
+ 	"detailed",
+ 	"verbose"
