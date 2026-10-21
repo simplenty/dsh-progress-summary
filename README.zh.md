@@ -109,6 +109,7 @@ dsh plugin --profile web add "link:$PWD"
 | `maxPerTurn` | `40` | 每轮调用上限（成本天花板） |
 | `lang` | `auto` | `auto` 跟随 `DSH_TUI_LANG` / `LANG`，否则 `zh` / `en` |
 | `quickLines` | `true` | 每个工具边界先发一条零成本的行，不依赖模型 |
+| `subagents` | `false` | 是否也播报子智能体会话 |
 | `debug` | `true` | 把阶段日志写到 `~/.dsh/progress-summary-debug.log`（上限 256KB） |
 | `publish` | `true` | 提交 ignorable 插件记录，供 Web 端投影 |
 | `tui` | `true` | 向组合了 TUI 的进程注册 `ctx.tuiStatus` 行 |

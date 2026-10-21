@@ -172,6 +172,8 @@ export const Config = z.object({
   tui: z.boolean().default(true),
   /** Publish an instant, model-free line on every tool boundary. */
   quickLines: z.boolean().default(true),
+  /** Narrate subagent sessions too; off by default to avoid paying for hidden work. */
+  subagents: z.boolean().default(false),
   /** Append a bounded diagnostics log under the harness home. */
   debug: z.boolean().default(true),
 })/** Defaults, used when the loader passes an incomplete object. */
@@ -192,6 +194,7 @@ const DEFAULTS = {
   publish: true,
   tui: true,
   quickLines: true,
+  subagents: false,
   debug: true,
 }
 
@@ -295,6 +298,7 @@ function resolveConfig(raw) {
     publish: merged.publish !== false,
     tui: merged.tui !== false,
     quickLines: merged.quickLines !== false,
+    subagents: merged.subagents === true,
     debug: merged.debug !== false,
   }
 }
@@ -641,7 +645,15 @@ export function apply(ctx, raw = {}) {
     return runtime
   }
 
+  /**
+   * Whether a session belongs to the narration surface.
+   * @param session - session object.
+   * @returns false for delegated subagent sessions unless configured.
+   */
+  const narratable = session => config.subagents || (session?.header?.delegationDepth ?? 0) === 0
+
   ctx.on('session/event', (session, event) => {
+    if (!narratable(session)) return
     const runtime = runtimes.get(session)
     switch (event.type) {
       case 'turn/start': {
@@ -679,13 +691,19 @@ export function apply(ctx, raw = {}) {
       }
       case 'tool/call': {
         if (!liveEnabled()) return
-        if (runtime === undefined) {
-          log(`tool/call without runtime: ${String(event.data?.name)}`)
-          return
+        // A process that started mid-turn never saw `turn/start`; adopt the
+        // running turn here instead of dropping every later boundary.
+        const target = runtime ?? runtimeFor(session)
+        if (!target.narrator.active) {
+          const turn = Number(event.data?.turn ?? 0)
+          target.turn = turn
+          Object.assign(target.narrator.config, livePolicy())
+          target.narrator.beginTurn(turn)
+          log(`tool/call adopted open turn ${turn}`)
         }
         log(`tool ${String(event.data?.name)}`)
-        Object.assign(runtime.narrator.config, livePolicy())
-        runtime.narrator.noteTool(event.data?.name, event.data?.arguments)
+        Object.assign(target.narrator.config, livePolicy())
+        target.narrator.noteTool(event.data?.name, event.data?.arguments)
         return
       }
       case 'turn/end': {
@@ -700,13 +718,18 @@ export function apply(ctx, raw = {}) {
   ctx.on('agent/assistant-stream', payload => {
     if (!liveEnabled()) return
     const session = payload?.agent?.session
-    if (session === undefined) return
+    if (session === undefined || !narratable(session)) return
     const frame = payload.frame
     if (frame?.type !== 'chunk' || frame.chunk === undefined) return
     const chunk = frame.chunk
     if (chunk.type !== 'reasoning-delta' && chunk.type !== 'text-delta') return
-    const runtime = runtimes.get(session)
-    if (runtime === undefined) return
+    const runtime = runtimeFor(session)
+    if (!runtime.narrator.active) {
+      // Same adoption rule for a text-only step: start a lazy turn so a
+      // restart mid-turn still narrates.
+      runtime.narrator.beginTurn(runtime.turn)
+      log('text adopted open turn')
+    }
     runtime.narrator.noteText(chunk.text)
   })
 

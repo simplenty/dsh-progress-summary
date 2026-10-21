@@ -275,3 +275,39 @@ test('turn start publishes an intro line before any model output', () => {
   handlers['session/event']({ id: 's' }, { type: 'turn/start', data: { turn: 1 } })
   assert.equal(tui.calls[0].text, '正在分析需求')
 })
+
+test('a tool call after a restart adopts the already-open turn', async () => {
+  const tui = { calls: [], set(key, text) { this.calls.push({ key, text }) } }
+  const { ctx, handlers } = fakeCtx({
+    llm: { async prepareCall() { throw new Error('not needed') } },
+    sessionProjections: { register() {} },
+    tuiStatus: tui,
+  })
+  apply(ctx, { ...ready, quickLines: true, minTokens: 10_000 })
+  const session = { id: 'session-adopt', header: { delegationDepth: 0 } }
+  // No turn/start: the process started mid-turn.
+  handlers['session/event'](session, {
+    type: 'tool/call',
+    data: { turn: 7, step: 1, callId: 'c', name: 'bash', arguments: '{"command":"ls"}' },
+  })
+  await sleep(20)
+  assert.deepEqual(tui.calls.at(-1), { key: 'progress-summary', text: '正在运行命令 · ls' })
+})
+
+test('subagent sessions are skipped unless enabled', async () => {
+  const tui = { calls: [], set(key, text) { this.calls.push({ key, text }) } }
+  const { ctx, handlers } = fakeCtx({
+    llm: { async prepareCall() { throw new Error('not needed') } },
+    sessionProjections: { register() {} },
+    tuiStatus: tui,
+  })
+  apply(ctx, { ...ready, quickLines: true })
+  const session = { id: 'session-child', header: { delegationDepth: 1 } }
+  handlers['session/event'](session, { type: 'turn/start', data: { turn: 1 } })
+  handlers['session/event'](session, {
+    type: 'tool/call',
+    data: { turn: 1, name: 'bash', arguments: '{"command":"ls"}' },
+  })
+  await sleep(20)
+  assert.equal(tui.calls.length, 0)
+})

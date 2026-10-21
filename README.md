@@ -100,6 +100,7 @@ is enough. It has no bearing on publishing.
 | `publish` | `true` | Commit ignorable records so the Web UI receives lines |
 | `tui` | `true` | Contribute the line to a composed TUI |
 | `quickLines` | `true` | Publish the free per-tool line |
+| `subagents` | `false` | Narrate subagent sessions too |
 | `debug` | `true` | Append a bounded diagnostics log under `~/.dsh/` |
 
 Fields marked live are volatile: a save takes effect on the next tool boundary, without a restart.
@@ -123,6 +124,8 @@ Both profiles load the same package; only the available services differ.
   `Session` brand does not match the live session objects.
 - The auxiliary route defaults to the session's logged `request/header` route, so no separate
   credentials or model catalog entry is needed.
+- A process that starts mid-turn (a restart while a turn is running) adopts that turn at the first
+  tool boundary instead of staying silent until the next turn.
 
 ## Known limitations
 
