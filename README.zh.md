@@ -50,7 +50,19 @@ DeepSeek 只有原始 `reasoning_content`，没有这一层。两条替代路线
 
 ## 安装
 
-### 从 npm（发布后）
+### 从 git 标签安装（不需要 npm）
+
+```bash
+dsh plugin --profile web add "github:tastynoob/dsh-progress-summary#v0.1.0"
+dsh plugin --profile dsh-tui add "github:tastynoob/dsh-progress-summary#v0.1.0"   # 可选
+```
+
+`dsh plugin add` 会把 spec 转给 pnpm，所以 pnpm 支持的 git 写法都行：
+`github:user/repo#tag`、`git+https://github.com/user/repo.git#tag`、或直接的
+`https://github.com/user/repo#tag`。标签用来固定版本；本包没有构建步骤，pnpm 克隆后直接
+从 registry 装依赖即可。
+
+### 从 npm 安装（发布后）
 
 ```bash
 dsh plugin --profile web add dsh-progress-summary

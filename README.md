@@ -59,6 +59,18 @@ Caps: `maxPerTurn` (default 40) calls per turn, 96 output tokens per call, `effo
 
 ## Install
 
+### From a git tag (no registry needed)
+
+```bash
+dsh plugin --profile web add "github:tastynoob/dsh-progress-summary#v0.1.0"
+dsh plugin --profile dsh-tui add "github:tastynoob/dsh-progress-summary#v0.1.0"   # optional
+```
+
+`dsh plugin add` forwards the spec to pnpm, so any pnpm git form works:
+`github:user/repo#tag`, `git+https://github.com/user/repo.git#tag`, or the plain
+`https://github.com/user/repo#tag`. The tag pins the version; the package has no build step, so
+pnpm clones it and installs its dependencies from the registry.
+
 ### From npm (once published)
 
 ```bash
