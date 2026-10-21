@@ -54,5 +54,13 @@
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "check": "node --check index.js && node --check client.js && node --check narrator.js && node --check projection.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tastynoob/dsh-progress-summary.git"
+  },
+  "homepage": "https://github.com/tastynoob/dsh-progress-summary#readme",
+  "bugs": {
+    "url": "https://github.com/tastynoob/dsh-progress-summary/issues"
   }
 }

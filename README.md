@@ -1,5 +1,7 @@
 # dsh-progress-summary
 
+[![test](https://github.com/tastynoob/dsh-progress-summary/actions/workflows/test.yml/badge.svg)](https://github.com/tastynoob/dsh-progress-summary/actions/workflows/test.yml)
+
 Out-of-band progress narration for DeepSeek Harness: a cheap auxiliary model turns the live
 chain of thought into one short status line, shown above the composer in the Web UI and on the
 dsh-tui status line.

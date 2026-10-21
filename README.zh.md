@@ -1,5 +1,7 @@
 # dsh-progress-summary
 
+[![test](https://github.com/tastynoob/dsh-progress-summary/actions/workflows/test.yml/badge.svg)](https://github.com/tastynoob/dsh-progress-summary/actions/workflows/test.yml)
+
 给 DeepSeek Harness 加一条**旁路生成**的进度摘要：不打扰主模型，用一个小模型把实时思考压成一行"人话"，
 同时出现在 Web UI 的输入区上方和 dsh-tui 的状态行。
 
