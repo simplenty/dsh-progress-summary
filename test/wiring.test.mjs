@@ -271,7 +271,7 @@ test('turn start publishes an intro line before any model output', () => {
     sessionProjections: { register() {} },
     tuiStatus: tui,
   })
-  apply(ctx, { lang: 'zh' })
+  apply(ctx, { lang: 'zh', quickLines: true })
   handlers['session/event']({ id: 's' }, { type: 'turn/start', data: { turn: 1 } })
   assert.equal(tui.calls[0].text, '正在分析需求')
 })

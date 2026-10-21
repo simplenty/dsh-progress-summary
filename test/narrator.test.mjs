@@ -54,10 +54,11 @@ test('quickToolLine maps common tools to a readable line', () => {
   assert.equal(quickToolLine('', '{}', 'zh', 28), '')
 })
 
-test('userPrompt hides empty fields', () => {
-  const prompt = userPrompt({ lastLine: '', tool: '', excerpt: 'abc', lang: 'zh' })
+test('userPrompt carries only the previous line and the reasoning', () => {
+  const prompt = userPrompt({ lastLine: '', excerpt: 'abc', lang: 'zh' })
   assert.match(prompt, /上一条：（无）/u)
-  assert.match(prompt, /当前动作：思考中/u)
+  assert.match(prompt, /最近思考：abc/u)
+  assert.doesNotMatch(prompt, /当前动作/u)
 })
 
 test('a tool boundary summarizes the complete reasoning before it', async () => {
@@ -256,5 +257,21 @@ test('quick lines never consume the model time floor', async () => {
   narrator.noteTool('bash', '{"command":"ls"}')
   await sleep(20)
   assert.equal(calls, 1, 'the second boundary is blocked by the model floor')
+  narrator.dispose()
+})
+
+test('a tool boundary without reasoning produces no summary', async () => {
+  let calls = 0
+  const narrator = new Narrator(config(), {
+    callModel: async () => {
+      calls += 1
+      return '不该出现'
+    },
+    publish: () => {},
+  })
+  narrator.beginTurn(1)
+  narrator.noteTool('bash', '{"command":"ls"}')
+  await sleep(20)
+  assert.equal(calls, 0)
   narrator.dispose()
 })

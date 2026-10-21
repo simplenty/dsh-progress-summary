@@ -170,8 +170,8 @@ export const Config = z.object({
   publish: z.boolean().default(true),
   /** Contribute the line to a composed TUI. */
   tui: z.boolean().default(true),
-  /** Publish an instant, model-free line on every tool boundary. */
-  quickLines: z.boolean().default(true),
+  /** Publish instant model-free lines (turn start, every tool call); off by default. */
+  quickLines: z.boolean().default(false),
   /** Narrate subagent sessions too; off by default to avoid paying for hidden work. */
   subagents: z.boolean().default(false),
   /** Append a bounded diagnostics log under the harness home. */
@@ -193,7 +193,7 @@ const DEFAULTS = {
   lang: AUTO,
   publish: true,
   tui: true,
-  quickLines: true,
+  quickLines: false,
   subagents: false,
   debug: true,
 }

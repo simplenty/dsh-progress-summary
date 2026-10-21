@@ -71,14 +71,16 @@ export function systemPrompt(lang) {
   if (lang === 'en') {
     return [
       'You are the progress narrator of a coding agent. The reader is waiting and cannot see the agent\'s internal reasoning.',
-      'From the latest reasoning excerpt and the current action, write ONE plain progress line in English that says what the agent is doing and why.',
+      'From the latest reasoning excerpt, write ONE plain progress line in English that says what the agent is trying to achieve and where it stands.',
+      'The reader already sees every tool call in the transcript, so never name a tool, command, path or file; describe the intent and the progress instead.',
       'Rules: one sentence, at most 30 words; no quotes, markdown, prefix or trailing period; do not repeat the previous line.',
       'Output only that line.',
     ].join('\n')
   }
   return [
     '你是编码智能体的进度播报员。读者正在等结果，看不到模型的内部思考。',
-    '根据"最近思考"和"当前动作"，写一行中文进度说明，讲清它现在在做什么、为什么。',
+    '根据"最近思考"，写一行中文进度说明：它想达成什么、现在走到哪一步。',
+    '读者已经在工作步骤里看到了每次工具调用，所以不要复述工具名、命令、路径或文件名，只写目的和进展。',
     '规则：一句话，尽量不超过 100 字；不要引号、Markdown、前缀或句末标点；不要与"上一条"雷同；信息不足时写得更概括。',
     '只输出这一行。',
   ].join('\n')
@@ -86,20 +88,22 @@ export function systemPrompt(lang) {
 
 /**
  * Build the user turn handed to the summarizer.
- * @param input - previous line, current tool, reasoning excerpt, language.
+ *
+ * The current tool call is deliberately absent: the reader already sees it in
+ * the transcript, and feeding it here only tempts the model to narrate the
+ * command instead of the progress.
+ * @param input - previous line, reasoning excerpt, language.
  * @returns the user prompt text.
  */
-export function userPrompt({ lastLine, tool, excerpt, lang }) {
+export function userPrompt({ lastLine, excerpt, lang }) {
   if (lang === 'en') {
     return [
       `Previous: ${lastLine === '' ? '(none)' : lastLine}`,
-      `Current action: ${tool === '' ? 'thinking' : tool}`,
       `Latest reasoning: ${excerpt === '' ? '(none)' : excerpt}`,
     ].join('\n')
   }
   return [
     `上一条：${lastLine === '' ? '（无）' : lastLine}`,
-    `当前动作：${tool === '' ? '思考中' : tool}`,
     `最近思考：${excerpt === '' ? '（无）' : excerpt}`,
   ].join('\n')
 }
@@ -213,8 +217,6 @@ export class Narrator {
     this.buffer = ''
     /** @type {string} */
     this.lastLine = ''
-    /** @type {string} */
-    this.tool = ''
     /** @type {number} */
     this.turn = 0
     /** @type {number} */
@@ -250,7 +252,6 @@ export class Narrator {
     this.lastSummaryAt = 0
     this.lastModelAt = 0
     this.buffer = ''
-    this.tool = ''
     this.lastLine = ''
     this.lastAt = 0
     this.active = true
@@ -277,7 +278,6 @@ export class Narrator {
    */
   noteTool(name, args) {
     if (!this.active) return
-    this.tool = toolLabel(name, args, 60)
     if (this.config.quickLines) {
       const quick = quickToolLine(name, args, this.config.lang, this.config.maxLineChars)
       if (quick !== '' && quick !== this.lastLine) {
@@ -301,7 +301,6 @@ export class Narrator {
     this.pending = false
     this.buffer = ''
     this.dirty = 0
-    this.tool = ''
     this.lastLine = ''
     this.publish('', 'idle')
   }
@@ -339,9 +338,9 @@ export class Narrator {
       return
     }
     if (this.calls >= this.config.maxPerTurn) return
-    // A tool-only boundary (no reasoning before the call) still summarizes:
-    // the tool label is the one fact the reader can be told.
-    const excerpt = tailText(this.buffer, this.config.excerptChars) || this.tool
+    // A tool-only boundary (no reasoning before the call) has nothing to
+    // summarize; the transcript already shows the call itself.
+    const excerpt = tailText(this.buffer, this.config.excerptChars)
     if (excerpt === '') return
     this.inFlight = true
     this.calls += 1
@@ -356,7 +355,7 @@ export class Narrator {
     try {
       const raw = await this.hooks.callModel({
         system: systemPrompt(this.config.lang),
-        user: userPrompt({ lastLine: this.lastLine, tool: this.tool, excerpt, lang: this.config.lang }),
+        user: userPrompt({ lastLine: this.lastLine, excerpt, lang: this.config.lang }),
         signal: controller.signal,
       })
       if (!this.active || controller.signal.aborted) return

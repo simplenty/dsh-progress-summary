@@ -35,8 +35,8 @@ Two layers: **free lines** update at every boundary, **model lines** fire only b
 
 | Trigger | Output | Cost |
 |---|---|---|
-| Turn start | "Analyzing the request" | 0 |
-| Every tool call | "running · npm test" derived from the tool name and arguments | 0 |
+| Turn start (opt-in) | "Analyzing the request" | 0 |
+| Every tool call (opt-in) | a line derived from the tool name and arguments | 0 |
 | **Before a tool call**, with both floors met | one sentence from the auxiliary model | 1 call |
 | Turn end | idle, clearing both surfaces | 0 |
 
@@ -54,6 +54,10 @@ tokenization gaps), which is why there is no timer-based trigger.
 Below either floor the material stays buffered and the next tool boundary re-checks. A failed call
 returns the consumed characters and retries at the next boundary. Turns without tool calls get no
 model line at all — a deliberate trade: rather than cut into a reasoning block, stay quiet.
+
+The two free rows are off by default (`quickLines: false`): the dock is a summary surface, not a
+second command log. The prompt also forbids naming tools, commands, or paths, because the
+transcript already shows every call.
 
 Caps: `maxPerTurn` (default 40) calls per turn, 96 output tokens per call, `effort=off`.
 
@@ -113,7 +117,7 @@ is enough. It has no bearing on publishing.
 | `lang` | `auto` | `auto` follows the host locale; `zh` / `en` pin it |
 | `publish` | `true` | Commit ignorable records so the Web UI receives lines |
 | `tui` | `true` | Contribute the line to a composed TUI |
-| `quickLines` | `true` | Publish the free per-tool line |
+| `quickLines` | `false` | Opt into the free turn-start/per-tool lines |
 | `subagents` | `false` | Narrate subagent sessions too |
 | `debug` | `true` | Append a bounded diagnostics log under `~/.dsh/` |
 
