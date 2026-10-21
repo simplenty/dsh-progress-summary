@@ -23,6 +23,7 @@
  * @module dsh-progress-summary
  */
 
+import { randomUUID } from 'node:crypto'
 import { appendFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -30,8 +31,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { types } from 'node:util'
 import { createRequire } from 'node:module'
 import z from '@deepseek-ai/schemastery'
-import { appendPluginRecord } from '@deepseek-ai/dsh-session'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { Narrator } from './narrator.js'
 import { createProgressProjection, PROGRESS_RECORD_TYPE } from './projection.js'
 
@@ -62,7 +61,6 @@ function appendCandidates() {
       // That tree does not resolve the package (or refuses CJS require of ESM).
     }
   }
-  push(appendPluginRecord)
   return found
 }
 
@@ -569,10 +567,12 @@ export function apply(ctx, raw = {}) {
       const call = await prepareWithEffort(llm, route, timeout.signal)
       log(`prepareCall ok ${route.provider}/${route.model}`)
       const messages = [
-        createUserMessage({
+        {
+          id: randomUUID(),
+          role: 'user',
           content: [{ type: 'text', text: user }],
           source: { kind: 'progress-summary' },
-        }),
+        },
       ]
       let text = ''
       for await (const chunk of call.stream({

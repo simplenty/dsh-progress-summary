@@ -74,7 +74,9 @@ dsh plugin --profile dsh-tui add dsh-progress-summary   # 可选：TUI
 
 包声明了 `dsh.bundle.patch`，`dsh plugin add` 会把它加进 profile 的 bundle 层列表；
 `cordis.patch.yml` 插入 `progress-summary` 行，`dsh.client` 让 Web 端加载浏览器半区。
-依赖（`@deepseek-ai/dsh-session` / `dsh-llm` / `schemastery`）由 pnpm 从 registry 装进 profile。
+
+插件**不依赖任何 DSH 核心包**：session 模块和写记录的函数都在运行时从 Loader 自己的模块实例取，
+所以安装它不会把不同版本的核心包带进 profile，也就不会顶掉宿主正在用的版本。
 
 卸载：`dsh plugin --profile web remove dsh-progress-summary`。
 

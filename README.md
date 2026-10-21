@@ -84,8 +84,9 @@ dsh plugin --profile dsh-tui add dsh-progress-summary   # optional: TUI
 
 The package declares `dsh.bundle.patch`, so `dsh plugin add` appends it to the profile's bundle
 list; `cordis.patch.yml` inserts the `progress-summary` row and `dsh.client` makes the Web client
-load the browser half. Dependencies (`@deepseek-ai/dsh-session`, `dsh-llm`, `schemastery`) are
-installed into the profile by pnpm.
+load the browser half. The plugin deliberately depends on **no DSH core package**: the session
+module and the record-append function come from the Loader's own module instance at runtime, so
+installing it can never shadow the host's core packages with different versions.
 
 Remove with `dsh plugin --profile web remove dsh-progress-summary`.
 
