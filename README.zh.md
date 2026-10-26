@@ -1,13 +1,27 @@
 # dsh-progress-summary
 
-[![test](https://github.com/tastynoob/dsh-progress-summary/actions/workflows/test.yml/badge.svg)](https://github.com/tastynoob/dsh-progress-summary/actions/workflows/test.yml)
+[![test](https://github.com/simplenty/dsh-progress-summary/actions/workflows/test.yml/badge.svg)](https://github.com/simplenty/dsh-progress-summary/actions/workflows/test.yml)
 
 给 DeepSeek Harness 加一条**旁路生成**的进度摘要：不打扰主模型，用一个小模型把实时思考压成一行"人话"，
-同时出现在 Web UI 的输入区上方和 dsh-tui 的状态行。
+同时出现在 Web UI 的运行状态行和 dsh-tui 的状态行。
+
+> **本仓库是 [tastynoob/dsh-progress-summary](https://github.com/tastynoob/dsh-progress-summary) 的 fork**（MIT），独立维护，不向上游提 PR。
+> 安装：`dsh plugin --profile web add github:simplenty/dsh-progress-summary`。
+
+## 本 fork：把摘要并进运行状态行
+
+- 摘要不再单独占用 composer 上方的一行，而是并进对话底部那条蓝色运行状态行：
+  `深度求索中，<短摘要>，用时 X 分 X 秒 ···`。
+- **长度按每个客户端的实际行宽计算**：桌面端最多 20 个汉字（CJK 宽度单位）；窄屏（行宽 < 420px，例如手机）
+  自动去掉「深度求索中，」前缀，只保留摘要与用时。同一个会话同时在手机和桌面打开时，两端各自按自己的宽度渲染。
+- 显示层压缩：去掉「目标是 / 正在 / 现在」等开头，只取第一个分句；完整原文保留在悬停提示里。
+- 保留原生末尾的 `···` 与计时；没有摘要时恢复原生标签，不改动原生行为。
+- 纯函数（`compactSummary` / `composeRunningLine` 等）导出在 `client.js` 的 `inline` 上，
+  `test/inline.test.mjs` 覆盖。
 
 ## 显示在哪
 
-- **Web**：输入框上方的那一行（composer 的 dock），不是对话流里的过程组标题。
+- **Web**：并进对话底部的运行状态行（`深度求索中，…，用时 …`），不是输入框上方的另一行，也不是对话流里的过程组标题。
 - **dsh-tui**：输入区上方的状态行。
 - **开关**：设置 → 通用 → **显示进度摘要**。关掉后不产生任何模型调用，TUI 行也会立即清空。
   其它参数（模型、间隔、token 阈值、语言）在 Plugins 页的插件表单里。

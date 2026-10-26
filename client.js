@@ -16,60 +16,280 @@ window.__ModuleLoader__.load({
     /** Projection key registered by the host half. */
     const KEY = 'progressSummary'
 
-    const rowStyle = {
-      boxSizing: 'border-box',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-      width: '100%',
-      // Align with the chat text column, not the wider composer card: the dock
-      // row is centered on the same axis as the transcript.
-      maxWidth: 'var(--dsh-chat-content-width, 748px)',
-      margin: '0 auto',
-      minWidth: 0,
-      padding: '2px 0 4px',
-      color: 'var(--dsw-alias-label-secondary, #666)',
-      fontSize: 'var(--dsh-content-font-size-secondary, 13px)',
-      lineHeight: '18px',
+    /** Attribute that marks the text this fork writes into the running line. */
+    const INLINE_ATTR = 'data-progress-summary-inline'
+
+    /** Hard cap for the merged summary, in CJK-character units. */
+    const SUMMARY_MAX_UNITS = 20
+
+    /** Running rows narrower than this drop the "deep diving" prefix. */
+    const NARROW_ROW_PX = 420
+
+    /** Trailing dots used when the native label carries none. */
+    const DEFAULT_DOTS = ' ···'
+
+    /** Latest summary line, mirrored outside React for the DOM sync. */
+    let inlineLine = ''
+
+    /** Body observer that keeps the composed line in step with React. */
+    let inlineObserver
+
+    /** Resize observer that keeps the summary length in step with the width. */
+    let inlineSizer
+
+    /** Row currently watched by inlineSizer. */
+    let inlineSizerRow = null
+
+    /** Canvas context reused to measure the running label's font. */
+    let inlineMeasure
+
+    /** Whether one DOM sync is already queued for the next microtask. */
+    let inlineQueued = false
+
+    /** Schedule one DOM sync per microtask. */
+    function scheduleInline() {
+      if (inlineQueued) return
+      inlineQueued = true
+      queueMicrotask(() => {
+        inlineQueued = false
+        syncInline()
+      })
     }
 
-    const dotStyle = {
-      flex: '0 0 auto',
-      width: '6px',
-      height: '6px',
-      borderRadius: '50%',
-      background: 'currentColor',
-      opacity: 0.55,
+    /** One character's width in CJK units: full width 1, Latin 0.55, space 0.35. */
+    function charUnits(ch) {
+      if (/[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/.test(ch)) return 1
+      if (ch === ' ') return 0.35
+      return 0.55
     }
 
-    const textStyle = {
-      flex: '1 1 auto',
-      minWidth: 0,
-      overflow: 'hidden',
-      // Up to two lines: a 128-character line is too long for one row, but
-      // ellipsizing it on line one would defeat the point of the larger cap.
-      display: '-webkit-box',
-      WebkitBoxOrient: 'vertical',
-      WebkitLineClamp: 2,
-      whiteSpace: 'normal',
-      overflowWrap: 'anywhere',
+    /** Display width of a string in CJK-character units. */
+    function displayUnits(text) {
+      let total = 0
+      for (const ch of String(text)) total += charUnits(ch)
+      return total
+    }
+
+    /** Trim, squeeze whitespace, and drop filler openers. */
+    function compactSummary(text) {
+      let value = String(text ?? '').replace(/[\s\u3000]+/g, ' ').trim()
+      value = value.replace(/^(目标是|现在先|现在|正在|接下来|首先|先)[，,]?\s*/, '')
+      const clause = value.split(/[，。；、,;!?！？]/)[0].trim()
+      const picked = clause.length >= 6 ? clause : value
+      return picked.replace(/[，。；、,;\s]+$/, '')
+    }
+
+    /** Cut a summary to at most \"units\" CJK units, appending an ellipsis. */
+    function fitSummary(text, units) {
+      const limit = Math.max(1, Math.floor(units))
+      let out = ''
+      let used = 0
+      for (const ch of String(text)) {
+        if (used + charUnits(ch) + 1 > limit) return out === '' ? '' : out + '…'
+        used += charUnits(ch)
+        out += ch
+      }
+      return out
     }
 
     /**
-     * The dock entry: the host-composed progress line, or nothing at all while
-     * the turn is idle or no summary has arrived yet.
+     * Split the native running label into the prefix before the summary and the
+     * suffix after it (elapsed time and trailing dots).
+     * @param labelText - the label currently rendered by Chat.
+     * @returns the parts, or null for a shape this fork does not know.
+     */
+    function parseLabel(labelText) {
+      const label = String(labelText ?? '').trim()
+      if (label === '') return null
+      const zh = label.match(/^(.*?)[，,]?\s*用时\s*(.*?)(\s*···|\s*\.\.\.)?\s*$/)
+      if (zh !== null && zh[1].trim() !== '') {
+        const head = zh[1].trim().replace(/[，,]\s*$/, '')
+        return {
+          prefix: head + '，',
+          suffix: zh[2].trim() === '' ? '' : '，用时 ' + zh[2].trim() + (zh[3] ?? DEFAULT_DOTS),
+        }
+      }
+      const en = label.match(/^(.*?)\s+for\s+(.*?)(\s*···|\s*\.\.\.)?\s*$/i)
+      if (en !== null && en[1].trim() !== '') {
+        const head = en[1].trim().replace(/[，,]\s*$/, '')
+        return {
+          prefix: head + ', ',
+          suffix: en[2].trim() === '' ? '' : ', for ' + en[2].trim() + (en[3] ?? DEFAULT_DOTS),
+        }
+      }
+      const cjk = /[\u2E80-\u9FFF]/.test(label)
+      return { prefix: label + (cjk ? '，' : ', '), suffix: '' }
+    }
+
+    /**
+     * Compose the single blue line: prefix + shortened summary + elapsed time.
+     * @param options - label text, summary, width budget in CJK units, narrow flag.
+     * @returns the composed text and fitted summary, or null when nothing fits.
+     */
+    function composeRunningLine(options) {
+      const parsed = parseLabel(options.labelText)
+      if (parsed === null) return null
+      const source = compactSummary(options.summary)
+      if (source === '') return null
+      const budget = Math.min(SUMMARY_MAX_UNITS, Math.max(1, Math.floor(options.maxUnits ?? Infinity)))
+      const fitted = fitSummary(source, budget)
+      if (fitted === '') return null
+      const prefix = options.narrow === true ? '' : parsed.prefix
+      return { text: prefix + fitted + parsed.suffix, summary: fitted, prefix, suffix: parsed.suffix }
+    }
+
+    /** The visible running status content row that owns the whale and the label. */
+    function runningContent() {
+      const rows = document.querySelectorAll('[data-chat-running]')
+      let fallback = null
+      for (const running of rows) {
+        const content = running.querySelector('[class*="runningContent"]')
+        const host = content === null ? running : content
+        if (fallback === null) fallback = host
+        if (running.getClientRects().length > 0) return host
+      }
+      return fallback
+    }
+
+    /** The .running row wrapping the content; it carries the usable width. */
+    function runningRow(host) {
+      const row = typeof host.closest === 'function' ? host.closest('[data-chat-running]') : null
+      return row ?? host
+    }
+
+    /** Measure a string in pixels with the running label's own font. */
+    function textPx(text, font) {
+      try {
+        inlineMeasure ??= document.createElement('canvas').getContext('2d')
+        inlineMeasure.font = font
+        return inlineMeasure.measureText(text).width
+      } catch {
+        return displayUnits(text) * 12
+      }
+    }
+
+    /** Watch the row's width so the summary length follows resizes. */
+    function watchRow(row) {
+      if (typeof ResizeObserver !== 'function') return
+      if (inlineSizerRow === row) return
+      if (inlineSizerRow !== null) inlineSizer.unobserve(inlineSizerRow)
+      inlineSizerRow = row
+      if (row !== null) inlineSizer.observe(row)
+    }
+
+    /**
+     * Write the composed summary into the Chat running status line, hiding the
+     * native label while merged. Restores the native label when there is
+     * nothing to show.
+     */
+    function syncInline() {
+      const host = runningContent()
+      if (host === null) return
+      const label = host.querySelector('[class*="runningText"]')
+      if (label === null) return
+      let span = host.querySelector('[' + INLINE_ATTR + ']')
+      const restore = () => {
+        if (span !== null) span.remove()
+        label.style.display = ''
+      }
+      if (inlineLine === '') return restore()
+      const parsed = parseLabel(label.textContent)
+      if (parsed === null) return restore()
+      const row = runningRow(host)
+      watchRow(row)
+      const style = getComputedStyle(label)
+      const font =
+        style.font || style.fontStyle + ' ' + style.fontWeight + ' ' + style.fontSize + ' ' + style.fontFamily
+      const cjkPx = Math.max(1, textPx('中', font))
+      const rect = row.getBoundingClientRect()
+      const rowPx = rect.width > 0 ? rect.width : window.innerWidth || 1024
+      const narrow = rowPx < NARROW_ROW_PX
+      const chromePx = 22 + 6 + 12
+      const suffixPx = textPx(parsed.suffix, font)
+      const prefixPx = narrow ? 0 : textPx(parsed.prefix, font)
+      let maxUnits = Math.floor((rowPx - chromePx - suffixPx - prefixPx) / cjkPx)
+      let composed = composeRunningLine({
+        labelText: label.textContent,
+        summary: inlineLine,
+        maxUnits,
+        narrow,
+      })
+      if (composed === null && !narrow) {
+        maxUnits = Math.floor((rowPx - chromePx - suffixPx) / cjkPx)
+        composed = composeRunningLine({
+          labelText: label.textContent,
+          summary: inlineLine,
+          maxUnits,
+          narrow: true,
+        })
+      }
+      if (composed === null) return restore()
+      label.style.display = 'none'
+      if (span === null) {
+        span = document.createElement('span')
+        span.setAttribute(INLINE_ATTR, '')
+        span.style.cssText =
+          'flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;' +
+          'white-space:nowrap;font-variant-numeric:tabular-nums;' +
+          'color:var(--dsw-alias-label-deep-diving,var(--dsw-alias-label-secondary));'
+        host.appendChild(span)
+      }
+      if (span.textContent !== composed.text) span.textContent = composed.text
+      if (span.getAttribute('title') !== inlineLine) span.setAttribute('title', inlineLine)
+    }
+
+    /** Observe the document, the viewport, and the row while the entry is mounted. */
+    function attachInlineWatch() {
+      if (inlineObserver !== undefined) return
+      inlineObserver = new MutationObserver(scheduleInline)
+      inlineObserver.observe(document.body, { childList: true, subtree: true, characterData: true })
+      window.addEventListener('resize', scheduleInline, { passive: true })
+      if (typeof ResizeObserver === 'function') {
+        inlineSizer = new ResizeObserver(scheduleInline)
+        const host = runningContent()
+        if (host !== null) watchRow(runningRow(host))
+      }
+    }
+
+    /** Stop observing and leave the native label visible again. */
+    function detachInlineWatch() {
+      if (inlineObserver !== undefined) {
+        inlineObserver.disconnect()
+        inlineObserver = undefined
+      }
+      window.removeEventListener('resize', scheduleInline)
+      if (inlineSizer !== undefined) {
+        inlineSizer.disconnect()
+        inlineSizer = undefined
+        inlineSizerRow = null
+      }
+      const span = document.querySelector('[' + INLINE_ATTR + ']')
+      if (span !== null) span.remove()
+      for (const label of document.querySelectorAll('[data-chat-running] [class*="runningText"]')) {
+        label.style.display = ''
+      }
+    }
+
+    /**
+     * The dock entry renders nothing: the summary is merged into the Chat
+     * running status line as one blue sentence, so the reader sees one row
+     * instead of two. The effects own the DOM text.
      * @param props - dock slot props (the session standard kit).
-     * @returns the rendered row or null.
+     * @returns always null.
      */
     function ProgressRow(props) {
       const value = props.useProjection(KEY)
-      if (value === undefined || value.state !== 'running' || value.line === '') return null
-      return React.createElement(
-        'div',
-        { 'data-progress-summary': '', style: rowStyle, title: value.line },
-        React.createElement('span', { 'aria-hidden': 'true', style: dotStyle }),
-        React.createElement('span', { style: textStyle }, value.line),
-      )
+      inlineLine =
+        value !== undefined && value.state === 'running' && value.line !== '' ? String(value.line) : ''
+      React.useEffect(() => {
+        syncInline()
+      }, [value])
+      React.useEffect(() => {
+        attachInlineWatch()
+        scheduleInline()
+        return detachInlineWatch
+      }, [])
+      return null
     }
 
     const inject = ['slots']
@@ -441,6 +661,7 @@ window.__ModuleLoader__.load({
     module.exports.ProgressRow = ProgressRow
     module.exports.SummaryConfig = SummaryConfig
     module.exports.SummaryToggle = SummaryToggle
+    module.exports.inline = { compactSummary, displayUnits, fitSummary, parseLabel, composeRunningLine }
     return module.exports
   },
 })

@@ -1,14 +1,34 @@
 # dsh-progress-summary
 
-[![test](https://github.com/tastynoob/dsh-progress-summary/actions/workflows/test.yml/badge.svg)](https://github.com/tastynoob/dsh-progress-summary/actions/workflows/test.yml)
+[![test](https://github.com/simplenty/dsh-progress-summary/actions/workflows/test.yml/badge.svg)](https://github.com/simplenty/dsh-progress-summary/actions/workflows/test.yml)
 
 Out-of-band progress narration for DeepSeek Harness: a cheap auxiliary model turns the live
-chain of thought into one short status line, shown above the composer in the Web UI and on the
-dsh-tui status line.
+chain of thought into one short status line, merged into the Web UI's running status row and
+shown on the dsh-tui status line.
+
+> **This repository is a fork of [tastynoob/dsh-progress-summary](https://github.com/tastynoob/dsh-progress-summary)** (MIT).
+> It is maintained standalone and never opens pull requests against upstream.
+> Install: `dsh plugin --profile web add github:simplenty/dsh-progress-summary`.
+
+## Fork change: the summary lives inside the running status line
+
+- The summary no longer renders as its own row above the composer. It is merged into the blue
+  Chat running status line: `Deep diving, <summary>, for Xm Xs ···` (Chinese UI:
+  `深度求索中，<摘要>，用时 X 分 X 秒 ···`).
+- **The length follows each client's own row width.** On a wide desktop the summary is capped at
+  20 CJK-character units; on narrow rows (under 420 px, e.g. phones) the `深度求索中，` prefix is
+  dropped. The same session open on a phone and on the desktop renders independently.
+- Display-only compaction strips filler openers (`目标是` / `正在` / `现在`…) and keeps the first
+  clause; the full line stays available as the hover title.
+- The native trailing `···` and elapsed time are preserved; the native label is restored whenever
+  no summary is shown.
+- Pure helpers (`compactSummary`, `composeRunningLine`, …) are exported as `inline` and covered by
+  `test/inline.test.mjs`.
 
 ## Where it shows
 
-- **Web**: the row above the composer (the input dock), not the transcript's process rows.
+- **Web**: merged into the Chat running status row, not a second row above the composer and not the
+  transcript's process-group title.
 - **dsh-tui**: the keyed status line above the prompt.
 - **Switch**: Settings → General → **Show progress summary**. Turning it off cancels every
   auxiliary call and clears the TUI row immediately.

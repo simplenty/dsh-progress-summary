@@ -1,7 +1,7 @@
 {
   "name": "dsh-progress-summary",
-  "version": "0.1.0",
-  "description": "Out-of-band progress narration for DeepSeek Harness: a cheap auxiliary model turns live reasoning into one short status line, for the Web UI and dsh-tui",
+  "version": "0.2.0",
+  "description": "Out-of-band progress narration for DeepSeek Harness: a cheap auxiliary model turns live reasoning into one short status line, merged into the Chat running status row (Web) and the dsh-tui status line",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -20,6 +20,7 @@
     "cordis.patch.yml",
     "README.md",
     "README.zh.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "engines": {
@@ -55,10 +56,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tastynoob/dsh-progress-summary.git"
+    "url": "git+https://github.com/simplenty/dsh-progress-summary.git"
   },
-  "homepage": "https://github.com/tastynoob/dsh-progress-summary#readme",
+  "homepage": "https://github.com/simplenty/dsh-progress-summary#readme",
   "bugs": {
-    "url": "https://github.com/tastynoob/dsh-progress-summary/issues"
+    "url": "https://github.com/simplenty/dsh-progress-summary/issues"
   }
 }
